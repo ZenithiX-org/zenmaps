@@ -1,0 +1,238 @@
+<html><head><base href="https://websim.ai/maps/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZenMaps</title>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+  }
+  #map {
+    height: 100%;
+    width: 100%;
+  }
+  #search-container {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: white;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+  }
+  #search-input {
+    width: 300px;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+    outline: none;
+  }
+  #search-button, #set-home-button {
+    padding: 10px 15px;
+    font-size: 16px;
+    background-color: #4285F4;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  #search-button {
+    border-radius: 0 4px 4px 0;
+  }
+  #set-home-button {
+    border-radius: 4px;
+    margin-left: 10px;
+  }
+  #search-button:hover, #set-home-button:hover {
+    background-color: #3367D6;
+  }
+  .custom-popup .leaflet-popup-content-wrapper {
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    font-size: 16px;
+    line-height: 24px;
+    border-radius: 4px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+  }
+  .custom-popup .leaflet-popup-content-wrapper a {
+    color: #4285F4;
+  }
+  .custom-popup .leaflet-popup-tip-container {
+    width: 30px;
+    height: 15px;
+  }
+  .custom-popup .leaflet-popup-tip {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  #watermark {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    opacity: 0.7;
+    font-size: 24px;
+    font-weight: bold;
+    color: #4285F4;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="search-container">
+  <input type="text" id="search-input" placeholder="Search for a location">
+  <button id="search-button">Search</button>
+  <button id="set-home-button">Set as Home</button>
+</div>
+<div id="map"></div>
+<div id="watermark">ZenMaps</div>
+
+<script>
+  let map = L.map('map').setView([0, 0], 2);
+  let homeMarker = null;
+  let homeLocation = null;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  function searchLocation() {
+    const query = document.getElementById('search-input').value;
+    if (query) {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.length > 0) {
+            const { lat, lon } = data[0];
+            map.setView([lat, lon], 13);
+            showLocationPopup(lat, lon, data[0].display_name);
+          } else {
+            alert('Location not found');
+          }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+  }
+
+  function setHomeLocation() {
+    const query = document.getElementById('search-input').value;
+    if (query) {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.length > 0) {
+            const { lat, lon } = data[0];
+            homeLocation = { lat, lon };
+            if (homeMarker) {
+              map.removeLayer(homeMarker);
+            }
+            homeMarker = L.marker([lat, lon], {
+              icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+              })
+            }).addTo(map);
+            homeMarker.bindPopup('<b>Home Location</b>').openPopup();
+            map.setView([lat, lon], 13);
+          } else {
+            alert('Location not found');
+          }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+  }
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance.toFixed(2);
+  }
+
+  function showLocationPopup(lat, lon, name) {
+    let popupContent = `
+      <h3>${name}</h3>
+      <p>Latitude: ${lat}</p>
+      <p>Longitude: ${lon}</p>
+    `;
+
+    if (homeLocation) {
+      const distance = calculateDistance(homeLocation.lat, homeLocation.lon, lat, lon);
+      popupContent += `<p>Distance from home: ${distance} km</p>`;
+    }
+
+    L.popup({ className: 'custom-popup' })
+      .setLatLng([lat, lon])
+      .setContent(popupContent)
+      .openOn(map);
+  }
+
+  document.getElementById('search-button').addEventListener('click', searchLocation);
+  document.getElementById('set-home-button').addEventListener('click', setHomeLocation);
+  document.getElementById('search-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      searchLocation();
+    }
+  });
+
+  // Custom map interactions
+  map.on('click', function(e) {
+    const { lat, lng } = e.latlng;
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+      .then(response => response.json())
+      .then(data => {
+        showLocationPopup(lat, lng, data.display_name);
+      })
+      .catch(error => console.error('Error:', error));
+  });
+
+  // Add some sample markers
+  const markers = [
+    { name: "Eiffel Tower", lat: 48.8584, lon: 2.2945 },
+    { name: "Statue of Liberty", lat: 40.6892, lon: -74.0445 },
+    { name: "Great Wall of China", lat: 40.4319, lon: 116.5704 },
+  ];
+
+  markers.forEach(marker => {
+    L.marker([marker.lat, marker.lon])
+      .addTo(map)
+      .bindPopup(`<b>${marker.name}</b>`);
+  });
+
+  // Animate the watermark
+  const watermark = document.getElementById('watermark');
+  let opacity = 0.7;
+  let fadeOut = true;
+
+  setInterval(() => {
+    if (fadeOut) {
+      opacity -= 0.01;
+      if (opacity <= 0.3) fadeOut = false;
+    } else {
+      opacity += 0.01;
+      if (opacity >= 0.7) fadeOut = true;
+    }
+    watermark.style.opacity = opacity;
+  }, 50);
+</script>
+</body>
+</html>
