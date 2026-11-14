@@ -1,238 +1,248 @@
-<html><head><base href="https://websim.ai/maps/">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZenMaps</title>
-<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-<style>
-  body, html {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: Arial, sans-serif;
-  }
-  #map {
-    height: 100%;
-    width: 100%;
-  }
-  #search-container {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: white;
-    padding: 10px;
-    border-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    display: flex;
-    align-items: center;
-  }
-  #search-input {
-    width: 300px;
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ddd;
-    border-radius: 4px 0 0 4px;
-    outline: none;
-  }
-  #search-button, #set-home-button {
-    padding: 10px 15px;
-    font-size: 16px;
-    background-color: #4285F4;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  #search-button {
-    border-radius: 0 4px 4px 0;
-  }
-  #set-home-button {
-    border-radius: 4px;
-    margin-left: 10px;
-  }
-  #search-button:hover, #set-home-button:hover {
-    background-color: #3367D6;
-  }
-  .custom-popup .leaflet-popup-content-wrapper {
-    background: rgba(255, 255, 255, 0.9);
-    color: #333;
-    font-size: 16px;
-    line-height: 24px;
-    border-radius: 4px;
-    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
-  }
-  .custom-popup .leaflet-popup-content-wrapper a {
-    color: #4285F4;
-  }
-  .custom-popup .leaflet-popup-tip-container {
-    width: 30px;
-    height: 15px;
-  }
-  .custom-popup .leaflet-popup-tip {
-    background: rgba(255, 255, 255, 0.9);
-  }
-  #watermark {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-    opacity: 0.7;
-    font-size: 24px;
-    font-weight: bold;
-    color: #4285F4;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    pointer-events: none;
-  }
-</style>
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ZenMaps — a calmer way to explore the world</title>
+  <meta name="description" content="ZenMaps is a lightweight, privacy-friendly map. Search any place, save favourites, measure distances and keep a home base — all without an account.">
+  <meta name="theme-color" content="#e9edef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#080b0e" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ZenMaps — a calmer way to explore the world">
+  <meta property="og:description" content="Search, save and measure on a map that stays out of your way. No account, no tracking.">
+
+  <script>
+    // Set the theme before first paint so dark mode does not flash white.
+    (function () {
+      try {
+        var stored = JSON.parse(localStorage.getItem('zenmaps.theme') || 'null');
+        if (stored !== 'dark' && stored !== 'light') {
+          stored = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = stored;
+      } catch (error) {
+        /* no storage, keep the default */
+      }
+    })();
+  </script>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/favicon.svg">
+
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
+
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/map.css">
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
-<div id="search-container">
-  <input type="text" id="search-input" placeholder="Search for a location">
-  <button id="search-button">Search</button>
-  <button id="set-home-button">Set as Home</button>
-</div>
-<div id="map"></div>
-<div id="watermark">ZenMaps</div>
+  <!-- Inline icon sprite: one definition, reused everywhere via <use>. -->
+  <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.75" cy="10.75" r="6.75"/><path d="m15.8 15.8 4.45 4.45"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5a8.7 8.7 0 1 0 10.7 10.7Z"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><circle cx="12" cy="12" r="7.6"/><path d="M12 1.8v2.6M12 19.6v2.6M1.8 12h2.6M19.6 12h2.6"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="m15.6 3.4 5 5L8.4 20.6l-5-5z"/><path d="m9.4 9.6 1.9 1.9M12.4 6.6l1.9 1.9M6.4 12.6l1.9 1.9"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.2 8.6 4.6-8.6 4.6-8.6-4.6z"/><path d="m3.4 12.4 8.6 4.6 8.6-4.6"/><path d="m3.4 16.6 8.6 4.6 8.6-4.6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 13.4v5.2A1.4 1.4 0 0 0 5.4 20h13.2a1.4 1.4 0 0 0 1.4-1.4v-5.2"/><path d="M12 15.2V3.6M8.2 6.8 12 3l3.8 3.8"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3.2 10.6 8.8-7 8.8 7"/><path d="M5.6 9.2V20h12.8V9.2"/><path d="M10 20v-4.6h4V20"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.6 2.66 5.46 5.94.86-4.3 4.2 1.02 5.98L12 17.28l-5.32 2.82 1.02-5.98-4.3-4.2 5.94-.86z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7.2h16"/><path d="M9.4 7.2V4.8h5.2v2.4"/><path d="m6.2 7.2 1 12.4h9.6l1-12.4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.2s6.8-6.1 6.8-11a6.8 6.8 0 1 0-13.6 0c0 4.9 6.8 11 6.8 11Z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="m20 4-8.5 8.5"/><path d="M18.4 13.6V19a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 19V7.4A1.4 1.4 0 0 1 5.4 6h5.4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.2V12l3.2 2"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6.4 9.2 5.6 5.6 5.6-5.6"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.8"/><path d="m15.4 8.6-2 4.8-4.8 2 2-4.8z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.6 4.6 4.6L19 6.8"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4.2 9.4h9.6a5.6 5.6 0 0 1 0 11.2H8.4"/><path d="M8.2 4.6 3.4 9.4l4.8 4.8"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 4.2 21 19.8H3z"/><path d="M12 9.6v4.2M12 16.8v.2"/></symbol>
+  </svg>
 
-<script>
-  let map = L.map('map').setView([0, 0], 2);
-  let homeMarker = null;
-  let homeLocation = null;
+  <div class="app" id="app" data-sheet="closed">
+    <aside class="panel" id="panel" aria-label="Search and saved places">
+      <div class="panel__grabber" aria-hidden="true"><span></span></div>
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+      <header class="brand-row">
+        <a class="brand" href="./" aria-label="ZenMaps home">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <path d="M5 11 16 5l11 6-11 6z" fill="currentColor" opacity=".95"/>
+              <path d="M5 17.4 16 23.4l11-6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+            </svg>
+          </span>
+          <span class="brand__name">
+            <strong>ZenMaps</strong>
+            <span>a calmer map</span>
+          </span>
+        </a>
 
-  function searchLocation() {
-    const query = document.getElementById('search-input').value;
-    if (query) {
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.length > 0) {
-            const { lat, lon } = data[0];
-            map.setView([lat, lon], 13);
-            showLocationPopup(lat, lon, data[0].display_name);
-          } else {
-            alert('Location not found');
-          }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-  }
+        <div class="brand-row__actions">
+          <button type="button" class="icon-btn" id="units-btn" title="Switch distance units" aria-label="Distance units: kilometres. Activate to switch to miles.">
+            <span class="icon-btn__unit" id="units-label">km</span>
+          </button>
+          <button type="button" class="icon-btn" id="theme-btn" title="Toggle theme" aria-label="Switch to dark theme">
+            <svg class="icon icon--sun" aria-hidden="true"><use href="#i-sun"/></svg>
+            <svg class="icon icon--moon" aria-hidden="true"><use href="#i-moon"/></svg>
+          </button>
+          <button type="button" class="icon-btn panel__collapse" id="sheet-btn" aria-label="Expand panel" aria-expanded="false" aria-controls="panel">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+      </header>
 
-  function setHomeLocation() {
-    const query = document.getElementById('search-input').value;
-    if (query) {
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data.length > 0) {
-            const { lat, lon } = data[0];
-            homeLocation = { lat, lon };
-            if (homeMarker) {
-              map.removeLayer(homeMarker);
-            }
-            homeMarker = L.marker([lat, lon], {
-              icon: L.icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-              })
-            }).addTo(map);
-            homeMarker.bindPopup('<b>Home Location</b>').openPopup();
-            map.setView([lat, lon], 13);
-          } else {
-            alert('Location not found');
-          }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-  }
+      <form class="search" id="search-form" role="search" novalidate>
+        <svg class="icon search__icon" aria-hidden="true"><use href="#i-search"/></svg>
+        <label class="sr-only" for="search-input">Search for a place</label>
+        <input
+          class="search__input"
+          id="search-input"
+          name="q"
+          type="text"
+          placeholder="Search a city, address or landmark"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          enterkeyhint="search"
+          aria-describedby="search-status">
+        <button type="submit" class="sr-only">Search</button>
+        <span class="spinner search__spinner" id="search-spinner" hidden aria-hidden="true"></span>
+        <button type="button" class="search__clear" id="search-clear" hidden aria-label="Clear search">
+          <svg class="icon icon--sm" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+        <kbd class="search__kbd" aria-hidden="true">/</kbd>
+      </form>
+      <p class="search__status" id="search-status" role="status" aria-live="polite"></p>
 
-  function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    return distance.toFixed(2);
-  }
+      <nav class="tabs" role="tablist" aria-label="Panel views">
+        <button class="tab" id="tab-results" type="button" role="tab" aria-selected="true" aria-controls="pane-results" data-tab="results">Results</button>
+        <button class="tab" id="tab-saved" type="button" role="tab" aria-selected="false" aria-controls="pane-saved" data-tab="saved" tabindex="-1">
+          Saved <span class="tab__count" id="saved-count" hidden>0</span>
+        </button>
+      </nav>
 
-  function showLocationPopup(lat, lon, name) {
-    let popupContent = `
-      <h3>${name}</h3>
-      <p>Latitude: ${lat}</p>
-      <p>Longitude: ${lon}</p>
-    `;
+      <div class="panel__body">
+        <section class="pane" id="pane-results" role="tabpanel" aria-labelledby="tab-results" tabindex="0">
+          <div class="recents" id="recents" hidden>
+            <h2 class="section-title">Recent searches</h2>
+            <div class="chips" id="recent-chips"></div>
+          </div>
 
-    if (homeLocation) {
-      const distance = calculateDistance(homeLocation.lat, homeLocation.lon, lat, lon);
-      popupContent += `<p>Distance from home: ${distance} km</p>`;
-    }
+          <ul class="place-list" id="result-list"></ul>
 
-    L.popup({ className: 'custom-popup' })
-      .setLatLng([lat, lon])
-      .setContent(popupContent)
-      .openOn(map);
-  }
+          <div class="empty" id="results-empty">
+            <svg class="empty__art" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+              <circle cx="48" cy="48" r="34" stroke="currentColor" stroke-width="2" opacity=".28"/>
+              <circle cx="48" cy="48" r="22" stroke="currentColor" stroke-width="2" stroke-dasharray="3 6" opacity=".55"/>
+              <path d="M60 36 52.5 52.5 36 60l7.5-16.5z" fill="currentColor" opacity=".85"/>
+              <circle cx="48" cy="48" r="3" fill="currentColor"/>
+            </svg>
+            <h2 class="empty__title">Find your way, calmly</h2>
+            <p class="empty__text">Search for any place on Earth, or click anywhere on the map to see what's there.</p>
+            <ul class="empty__tips">
+              <li><svg class="icon icon--sm" aria-hidden="true"><use href="#i-search"/></svg><span>Type at least 3 characters to search</span></li>
+              <li><svg class="icon icon--sm" aria-hidden="true"><use href="#i-pin"/></svg><span>Click the map to explore a spot</span></li>
+              <li><svg class="icon icon--sm" aria-hidden="true"><use href="#i-star"/></svg><span>Star places to keep them here</span></li>
+            </ul>
+          </div>
 
-  document.getElementById('search-button').addEventListener('click', searchLocation);
-  document.getElementById('set-home-button').addEventListener('click', setHomeLocation);
-  document.getElementById('search-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      searchLocation();
-    }
-  });
+          <div class="empty empty--compact" id="results-none" hidden>
+            <h2 class="empty__title" id="results-none-title">No places found</h2>
+            <p class="empty__text" id="results-none-text">Try a broader search — a city or region works best.</p>
+          </div>
 
-  // Custom map interactions
-  map.on('click', function(e) {
-    const { lat, lng } = e.latlng;
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-      .then(response => response.json())
-      .then(data => {
-        showLocationPopup(lat, lng, data.display_name);
-      })
-      .catch(error => console.error('Error:', error));
-  });
+          <div class="skeleton-list" id="results-skeleton" hidden aria-hidden="true">
+            <div class="skeleton-row"><span class="skeleton skeleton--dot"></span><span class="skeleton skeleton--line"></span></div>
+            <div class="skeleton-row"><span class="skeleton skeleton--dot"></span><span class="skeleton skeleton--line skeleton--short"></span></div>
+            <div class="skeleton-row"><span class="skeleton skeleton--dot"></span><span class="skeleton skeleton--line"></span></div>
+          </div>
+        </section>
 
-  // Add some sample markers
-  const markers = [
-    { name: "Eiffel Tower", lat: 48.8584, lon: 2.2945 },
-    { name: "Statue of Liberty", lat: 40.6892, lon: -74.0445 },
-    { name: "Great Wall of China", lat: 40.4319, lon: 116.5704 },
-  ];
+        <section class="pane" id="pane-saved" role="tabpanel" aria-labelledby="tab-saved" tabindex="0" hidden>
+          <ul class="place-list" id="saved-list"></ul>
+          <div class="empty empty--compact" id="saved-empty">
+            <svg class="empty__art empty__art--sm" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+              <path d="m48 22 8.4 17.2 19 2.8-13.7 13.3 3.2 18.9L48 65.3l-16.9 8.9 3.2-18.9L20.6 42l19-2.8z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" opacity=".45"/>
+            </svg>
+            <h2 class="empty__title">Nothing saved yet</h2>
+            <p class="empty__text">Tap the star on any search result to keep it here. Saved places stay in this browser only.</p>
+          </div>
+        </section>
+      </div>
 
-  markers.forEach(marker => {
-    L.marker([marker.lat, marker.lon])
-      .addTo(map)
-      .bindPopup(`<b>${marker.name}</b>`);
-  });
+      <footer class="panel__footer">
+        <p class="panel__credits">
+          Search by <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer">Nominatim</a>
+          · Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
+          contributors
+        </p>
+        <button type="button" class="link-btn" id="clear-recents" hidden>Clear history</button>
+      </footer>
+    </aside>
 
-  // Animate the watermark
-  const watermark = document.getElementById('watermark');
-  let opacity = 0.7;
-  let fadeOut = true;
+    <main class="map-shell">
+      <div id="map" class="map" role="application" aria-label="Interactive map. Use arrow keys to pan, plus and minus to zoom."></div>
 
-  setInterval(() => {
-    if (fadeOut) {
-      opacity -= 0.01;
-      if (opacity <= 0.3) fadeOut = false;
-    } else {
-      opacity += 0.01;
-      if (opacity >= 0.7) fadeOut = true;
-    }
-    watermark.style.opacity = opacity;
-  }, 50);
-</script>
+      <div class="map-tools" role="group" aria-label="Map tools">
+        <button type="button" class="tool-btn" id="locate-btn" title="Show my location" aria-label="Show my location">
+          <svg class="icon icon--lg" aria-hidden="true"><use href="#i-locate"/></svg>
+        </button>
+        <button type="button" class="tool-btn" id="measure-btn" title="Measure distance" aria-label="Measure distance" aria-pressed="false">
+          <svg class="icon icon--lg" aria-hidden="true"><use href="#i-ruler"/></svg>
+        </button>
+        <button type="button" class="tool-btn" id="basemap-btn" title="Map style" aria-label="Change map style" aria-haspopup="true" aria-expanded="false" aria-controls="basemap-menu">
+          <svg class="icon icon--lg" aria-hidden="true"><use href="#i-layers"/></svg>
+        </button>
+        <button type="button" class="tool-btn" id="share-btn" title="Copy link to this view" aria-label="Copy link to this view">
+          <svg class="icon icon--lg" aria-hidden="true"><use href="#i-share"/></svg>
+        </button>
+      </div>
+
+      <div class="popover" id="basemap-menu" role="menu" aria-label="Map style" hidden>
+        <p class="popover__title" aria-hidden="true">Map style</p>
+        <div class="basemap-list" id="basemap-list"><!-- filled by js/ui/toolbar.js --></div>
+      </div>
+
+      <div class="map-hint" id="map-hint">
+        <svg class="icon icon--sm" aria-hidden="true"><use href="#i-pin"/></svg>
+        <span>Click anywhere on the map to explore</span>
+        <button type="button" class="map-hint__close" id="map-hint-close" aria-label="Dismiss tip">
+          <svg class="icon icon--sm" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </div>
+
+      <div class="measure-hud" id="measure-hud" hidden>
+        <div class="measure-hud__value">
+          <span class="measure-hud__total" id="measure-total">0 m</span>
+          <span class="measure-hud__label" id="measure-label">Total distance · click the map to add points</span>
+        </div>
+        <div class="measure-hud__actions">
+          <button type="button" class="btn btn--ghost btn--sm" id="measure-undo">
+            <svg class="icon icon--sm" aria-hidden="true"><use href="#i-undo"/></svg>Undo
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm" id="measure-clear">Clear</button>
+          <button type="button" class="btn btn--primary btn--sm" id="measure-done">Done</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  </div>
+
+  <noscript>
+    <p style="position:fixed;inset:auto 0 0 0;margin:0;padding:16px;background:#111;color:#fff;text-align:center;z-index:9999">
+      ZenMaps needs JavaScript to draw the map. Please enable it to continue.
+    </p>
+  </noscript>
 </body>
 </html>

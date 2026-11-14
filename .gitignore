@@ -1,0 +1,11 @@
+# Dependencies (the site itself has none)
+node_modules/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Local scratch
+screenshots/
+*.local.*
